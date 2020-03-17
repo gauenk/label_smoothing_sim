@@ -41,6 +41,18 @@ def read_pickle(fn,verbose=True):
     if verbose: print("Load successful.")
     return data
 
+def read_ndarray(fn,verbose=True):
+    if verbose: print("[read_ndarray]: {} *zoom zoom*".format(fn))
+    if not osp.exists(fn):
+        raise ValueError("[read_ndarray]: no existing file named: {}".format(fn))
+        return None
+    ndarray = np.load(fn)
+    return ndarray
+
+def write_ndarray(fn,data):
+    if verbose: print("[write_ndarray]: {} *cha-chunk*".format(fn))
+    np.save(fn,data)
+
 def ndarray_groupby(ndarray_y,ndarray_x):
     # only groupby for first column
     uniq = np.unique(ndarray_y)

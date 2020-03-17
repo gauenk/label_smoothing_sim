@@ -14,6 +14,9 @@ jupyterlab = "*"
 opencv-python = "*"
 easydict = "*"
 nbconvert = "*"
+torch = "*"
+torchvision = "*"
+uuid = "*"
 
 [requires]
 python_version = "3.6"
