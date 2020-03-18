@@ -54,23 +54,26 @@ class PytorchModelWrapper(nn.Module):
 
     def __init__(self,model):
         super(type(self),self).__init__()
-        self.model = model
+        self.th_model = model
 
     def module_dict(self,module_name):
-        for layer in self.model.named_modules():
+        for layer in self.th_model.named_modules():
             if layer[0] == module_name:
                 return layer
         # print error message
-        for layer in self.model.named_modules():
+        for layer in self.th_model.named_modules():
             print(layer[0])
         raise KeyError("No module named [{}] in the model.".format(module_name))
 
 class FeatureExtractor():
 
-    def __init__(self,model,feature_layers):
-        self.py_model = model
-        if type(model) is not PytorchModelWrapper:
+    def __init__(self,in_model,feature_layers):
+        self.th_model = in_model
+        if type(in_model) is not PytorchModelWrapper:
             self.pyw_model = PytorchModelWrapper(model)
+        else:
+            self.th_model = in_model.th_model
+            self.pyw_model = in_model
         self.pyw_model.eval()
         self.activations = {}
         for layer_name in feature_layers:

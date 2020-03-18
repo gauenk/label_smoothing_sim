@@ -11,36 +11,48 @@ from easydict import EasyDict as edict
 # pytorch imports
 import torch
 import torch.nn.functional as F
+import torch.optim as optim
+from torchvision import datasets,transforms
+from torch.optim.lr_scheduler import StepLR
 
 # project imports
-from mnist_knn_parser import parser_args,set_cfg_from_args
+import _init_paths
+from mnist_knn_parser import parse_args,set_cfg_from_args
 from learning.train import pytrain_cls
 from learning.test import pytest_cls
-from base.pytorch import *
+from base.pyutils import *
 
 
-def load_cfg():
+def load_mnist_cfg():
+    # todo: move to shared "cfg" home.
     cfg = edict()
     cfg.epochs = 10
     cfg.device = 'cuda'
-    cfg.exp_name = 'testing'
-    cfg.use_cuda = False
+    cfg.use_cuda = True
     cfg.model_py = "./models/mnist/pytorch_default.py"
     cfg.model_th = None
+    cfg.batch_size = 128
+    cfg.gamma = 0.7
+    cfg.log_interval = 10
+    cfg.lr = 1.0
+    cfg.seed = 1
+
+    cfg.exp_name = 'testing'
     #cfg.exp_name = uuid.uuid4()
+    return cfg
 
 def load_mnist_model(cfg):
 
     # load pytorch model
     model_class = load_pytorch_model(cfg.model_py,cfg.model_th)
-    model = model_class().to(cfg.device)
-    model = PytorchModelWrapper(model)
+    th_model = model_class().to(cfg.device)
+    model = PytorchModelWrapper(th_model)
 
     # load feature extractor; e.g. "outputs" is more than final layer
-    layernames = [model.ftr_name,model.output_name]
+    layernames = [th_model.ftr_name,th_model.output_name]
     ftrModel = FeatureExtractor(model,layernames)
 
-    return ftrmodel
+    return ftrModel
 
 def load_mnist_data(cfg):
     kwargs = {'num_workers': 1, 'pin_memory': True} if cfg.use_cuda else {}
@@ -61,10 +73,10 @@ def load_mnist_data(cfg):
 
 def train_step(epoch, data, args, model, device, optimizer):
     # train
-    pytrain_cls(args, model.py_model, device, data, optimizer, epoch)
+    pytrain_cls(args, model.th_model, device, data, optimizer, epoch)
 
     # save updated params
-    save_model(model.py_model)
+    save_model(model.th_model)
 
     # compute train results
     return test_step(model,data)
@@ -132,11 +144,10 @@ def main():
     # Load settings
     # --------------
 
-    cfg = load_cfg()
+    cfg = load_mnist_cfg()
     args = parse_args()
     set_cfg_from_args(cfg,args)
     device = cfg.device
-    print(args.no_cuda,args.no-cuda)
     cfg.use_cuda = args.no_cuda and torch.cuda.is_available()
     
     # -------------------
@@ -145,6 +156,7 @@ def main():
 
     # load the mnist model
     model = load_mnist_model(cfg)
+    th_model = model.th_model
 
     # load the mnist data
     data = edict()
@@ -155,10 +167,9 @@ def main():
     # ----------------
 
     # inputs for train/test functions
-    args = []
-    optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
-    scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
-    inputs = [args, model, device, optimizer]
+    optimizer = optim.Adadelta(model.th_model.parameters(), lr=cfg.lr)
+    scheduler = StepLR(optimizer, step_size=1, gamma=cfg.gamma)
+    inputs = [cfg, model, device, optimizer]
 
     # gather data across several epochs of training
     results = edict() # classification results
