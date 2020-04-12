@@ -1,11 +1,27 @@
 # common functions used throughout the project
 
+# this is the only allowed project import in this file.
+import settings
+
 # ONLY python import in this file.
 import matplotlib
 # matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pickle,sys,os,io,cv2
 import numpy as np
+
+def np_divide(np_array_a,np_array_b):
+    not_np = False
+    if type(np_array_a) is not np.ndarray:
+        not_np = True
+        if type(np_array_a) is not list:
+            np_array_a = [np_array_a]
+        np_array_a = np.array(np_array_a)
+    ma_a = np.ma.masked_array(np_array_a)
+    div = (ma_a / np_array_b).filled(0)
+    if not_np:
+        div = div[0]
+    return div
 
 def np_log(np_array):
     if type(np_array) is not np.ndarray:
@@ -27,19 +43,31 @@ def np_binarize(np_array,threshold=0.5,inplace=False):
         c_array.astype(np.bool)
         return c_array
 
-def write_pickle(data,fn,verbose=True):
-    if verbose: print("Writing pickle to [{}]".format(fn))
+def write_pickle(data,fn,verbose=False):
+    if verbose or settings.verbose >= 2: print("Writing pickle to [{}]".format(fn))
     with open(fn,'wb') as f:
         pickle.dump(data,f)
     if verbose: print("Save successful.")
 
-def read_pickle(fn,verbose=True):
-    if verbose: print("Reading pickle file [{}]".format(fn))
+def read_pickle(fn,verbose=False):
+    if verbose or settings.verbose >= 2: print("Reading pickle file [{}]".format(fn))
     data = None
     with open(fn,'rb') as f:
         data = pickle.load(f)
     if verbose: print("Load successful.")
     return data
+
+def read_ndarray(fn,verbose=False):
+    if verbose or settings.verbose >= 2: print("[read_ndarray]: {} *zoom zoom*".format(fn))
+    if not osp.exists(fn):
+        raise ValueError("[read_ndarray]: no existing file named: {}".format(fn))
+        return None
+    ndarray = np.load(fn)
+    return ndarray
+
+def write_ndarray(fn,data):
+    if verbose or settings.verbose >= 2: print("[write_ndarray]: {} *cha-chunk*".format(fn))
+    np.save(fn,data)
 
 def ndarray_groupby(ndarray_y,ndarray_x):
     # only groupby for first column

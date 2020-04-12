@@ -3,6 +3,7 @@ This file contains a basic set of label denoising experiments.
 Generally, these functions produce a cache file that is better
 displayed inside of a Jupyter notebook.
 """
+import os.path as osp
 
 
 def exp_bernoulli_grid_label_noise_knn_k_max_vote():
