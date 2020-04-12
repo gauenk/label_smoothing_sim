@@ -8,7 +8,7 @@ Contains API for training a Pytorch deep learning model
 import torch as th
 import torch.nn.functional as F
 
-def pytest_cls(args, model, device, test_loader):
+def thtest_cls(args, model, device, test_loader):
     # test a classifier
     model.eval()
     test_loss = 0

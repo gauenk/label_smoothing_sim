@@ -1,5 +1,5 @@
+import sys,os
 import os.path as osp
-import sys
 
 def add_path(path):
     if path not in sys.path:
@@ -13,5 +13,9 @@ sys.path.append(lib_path)
 
 python_module_path = osp.join(this_dir,'..','lib/python_module')
 sys.path.append(python_module_path)
+
+python_module = osp.join(this_dir,'..')
+sys.path.append(python_module_path)
+
 
 

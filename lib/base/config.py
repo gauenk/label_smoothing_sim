@@ -222,5 +222,16 @@ def split_cfg_to_aux_and_global(cfg_file):
             global_cfg[key] = value
     return edict(aux_cfg),edict(global_cfg)
 
+def cfg_from_file(filename,merge_to=None):
+    """Load a config file and merge it into the default options."""
+    aux_cfg,yaml_cfg = split_cfg_to_aux_and_global(filename)
+    cfg_from_edict(yaml_cfg,merge_to=merge_to)
+    return aux_cfg
 
-
+def cfg_from_edict(edict_obj,merge_to=None):
+    """Load a config file and merge it into the default options."""
+    if merge_to is None:
+        merge_a_into_b(edict_obj, __C)
+    else:
+        merge_a_into_b(edict_obj, merge_to) 
+    load_tp_fn_record_path()

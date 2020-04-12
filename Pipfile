@@ -17,6 +17,10 @@ nbconvert = "*"
 torch = "*"
 torchvision = "*"
 uuid = "*"
+pypng = "*"
+seaborn = "*"
+line-profiler = "*"
+memory-profiler = "*"
 
 [requires]
 python_version = "3.6"

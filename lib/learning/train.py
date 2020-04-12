@@ -7,10 +7,9 @@ Contains API for training a Pytorch deep learning model
 # torch imports
 import torch.nn.functional as F
 
-def pytrain_cls(cfg, model, device, train_loader, optimizer, epoch):
+def thtrain_cls(cfg, model, device, train_loader, optimizer, epoch):
     # train a classifier
     model.train()
-    n = 5000
     idx = 0
     for batch_idx, (data, target) in enumerate(train_loader):
         idx += cfg.batch_size
@@ -27,7 +26,3 @@ def pytrain_cls(cfg, model, device, train_loader, optimizer, epoch):
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()))
-        
-
-        if idx > n:
-            break
