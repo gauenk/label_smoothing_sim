@@ -53,6 +53,6 @@ def main():
         cfg = load_cfg()
 
 
-if __name__ == __main__:
+if __name__ == "__main__":
     print("HI")
     main()
