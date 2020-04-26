@@ -21,6 +21,7 @@ pypng = "*"
 seaborn = "*"
 line-profiler = "*"
 memory-profiler = "*"
+pyyaml = "*"
 
 [requires]
 python_version = "3.6"

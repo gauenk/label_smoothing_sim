@@ -6,8 +6,10 @@ A common set of shared pytorch functions
 # python imports
 import importlib.util
 import os,warnings
+from functools import partial
 import os.path as osp
 import numpy as np
+import numpy.random as npr
 
 # torch imports
 import torch as th
@@ -39,7 +41,7 @@ def pytorch_model_outputs(model,data_loader,device):
     """
     # test a classifier
     model.eval()
-    cls,fc1,fc2 = [],[],[]
+    cls,ftr,final = [],[],[]
     with th.no_grad():
         for data, target in data_loader:
             data = data.to(device)
@@ -47,12 +49,12 @@ def pytorch_model_outputs(model,data_loader,device):
             # unpack the batch
             for i in range(len(raw_output[0])):
                 cls.append(raw_output[0][i])
-                fc1.append(raw_output[1]['fc1'][i])
-                fc2.append(raw_output[1]['fc2'][i])
+                ftr.append(raw_output[1]['ftr'][i])
+                final.append(raw_output[1]['final'][i])
     cls = np.array(cls)
-    fc1 = np.array(fc1)
-    fc2 = np.array(fc2)
-    outputs = {'cls':cls,'fc1':fc1, 'fc2':fc2}
+    ftr = np.array(ftr)
+    final = np.array(final)
+    outputs = {'cls':cls,'ftr':ftr, 'final':final}
     return outputs
 
 def save_pytorch_checkpoint(path,epoch,model_state_dict,optim_state_dict,loss,**kwargs):
@@ -98,8 +100,14 @@ def get_train_subset_indices(train_loader,n=10000):
     """
     Get indices for a representative subset of the classification training set
     """
-    data = train_loader.dataset.train_data.detach().numpy()
-    labels = train_loader.dataset.train_labels.detach().numpy()
+    data = train_loader.dataset.data
+    labels = train_loader.dataset.targets
+    if type(data) is th.Tensor:
+        data = data.detach().numpy()
+        labels = labels.detach().numpy()
+    if type(labels) is list:
+        labels = np.array(labels)
+
     d = data[0].shape
     #print(data[0].shape)
 
@@ -204,55 +212,41 @@ class FeatureExtractor():
 # DATASET FUNCTIONS
 #---------------------
 
-#
-# MNIST
-#
+def target_noise_transform(flipped_indices,flipped_labels,target,index):
+    if index in flipped_indices:
+        fl = flipped_labels[np.where(flipped_indices == index)][0]
+        return fl
+    else:
+        return target
 
-def target_noise_transform(info,target):
-    pass
+def apply_label_noise_level(cfg,ordered_targets):
 
-def apply_label_noise_level(cfg):
-    warnings.warn(f"Noise Level {cfg.noise_level}: Hardcoded N = 60k")
-    N = 60000
-    noise_level = cfg.noise_level
-    nflipped = N * noise_level
-    np.permutation(
+    N = cfg.n_train_samples
+    noise_level = cfg.label_noise
 
-def load_mnist_data(cfg):
+    # get number of flipped items and their index
+
+    nflipped = int(N * noise_level)
+    if nflipped == 0:
+        return None
+    flipped_indices = npr.permutation(N)[:nflipped]
+
+    # create the new, flipped label which are saved for each program iteration
+    flipped_labels = np.zeros(nflipped).astype(np.int)
+    for idx in range(nflipped):
+        ds_idx = flipped_indices[idx]
+        target = ordered_targets[ds_idx]
+        perm = npr.permutation(cfg.nclasses).astype(np.int)
+        flipped_labels[idx] = perm[np.where(perm != target)][0]
     
-    apply_label_noise = None
-    if cfg.label_noise is not None:
-        apply_label_noise = apply_label_noise_level(cfg)
-    kwargs = {'num_workers': 1, 'pin_memory': True} if cfg.use_cuda else {}
-    train_loader = th.utils.data.DataLoader(
-        datasets.MNIST(f'{cfg.root_path}/data', train=True, download=True,
-                       transform=transforms.Compose([
-                           transforms.ToTensor(),
-                           transforms.Normalize((0.1307,), (0.3081,))
-                       ]),
-                       target_transform=apply_label_noise),
-        batch_size=cfg.batch_size, shuffle=True, **kwargs)
-    train_subset_indices = get_train_subset_indices(train_loader)
-    train_subset_loader = th.utils.data.DataLoader(
-        th.utils.data.Subset(
-            datasets.MNIST(f'{cfg.root_path}/data', train=True, download=True,
-                           transform=transforms.Compose([
-                               transforms.ToTensor(),
-                               transforms.Normalize((0.1307,), (0.3081,))
-                           ])
-                           target_transform=apply_label_noise),
-            train_subset_indices
-            ),
-        batch_size=cfg.batch_size, shuffle=False, **kwargs)
-    test_loader = th.utils.data.DataLoader(
-        datasets.MNIST(f'{cfg.root_path}/data', train=False, transform=transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.1307,), (0.3081,))
-        ])),
-        batch_size=cfg.test_batch_size, shuffle=False, **kwargs)
-    return train_loader,test_loader,train_subset_loader
+    # TODO: cache the new labels
+    warnings.warn("We should be caching our randomly generated labels by exp uuid.")
 
-def get_features_from_raw(outputs,layer_name='fc1'):
+    # return the transfer functino 
+    label_xfer = partial(target_noise_transform,flipped_indices,flipped_labels)
+    return label_xfer
+
+def get_features_from_raw(outputs,layer_name='feature_layer'):
     return outputs[layer_name]
 
 

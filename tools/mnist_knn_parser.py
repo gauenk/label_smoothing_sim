@@ -25,7 +25,7 @@ def set_if_not_none(cfg,args,fieldname):
     else:
         return cfg[fieldname]
 
-def parse_args():
+def parse_args(force=False):
     """ Parse input args """
     parser = argparse.ArgumentParser(description="generate results from training a neural network on mnist data for labeling smoothing")
     parser.add_argument('--model_py',type=str,default=None,
@@ -48,8 +48,11 @@ def parse_args():
                         help='disables CUDA training')
     parser.add_argument('--default', action='store_true', default=False,
                         help='Just run me on default :D')
+    parser.add_argument('--cfg_file', type=str, default=None,
+                        help='Load config from a cfg file. This overwrite\
+                        everything including cmd input.')
 
-    if len(sys.argv) == 1:
+    if len(sys.argv) == 1 and force is False:
         parser.print_help()
         sys.exit(1)
     args = parser.parse_args()

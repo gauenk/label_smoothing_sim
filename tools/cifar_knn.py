@@ -1,6 +1,6 @@
 """
 Generate Similarity and KNN matrices from 
-neural networks trained on the MNIST dataset
+neural networks trained on the CIFAR dataset
 """
 
 
@@ -19,8 +19,8 @@ from torch.optim.lr_scheduler import StepLR
 
 # project imports
 import _init_paths
-from datasets.mnist import *
-from mnist_knn_parser import parse_args,set_cfg_from_args
+from datasets.cifar import *
+from mnist_knn_parser import parse_args,set_cfg_from_args # still mnist parser
 from nn_knn.utils import train_step,test_step,save_results
 from learning.train import thtrain_cls
 from learning.test import thtest_cls
@@ -30,7 +30,7 @@ from base.thutils import load_pytorch_model,PytorchModelWrapper,FeatureExtractor
 from base.utils import *
 
 
-def load_mnist_model(cfg):
+def load_cifar_model(cfg):
 
     # load pytorch model
     model_class = load_pytorch_model(cfg.model_py,cfg.model_th)
@@ -44,29 +44,31 @@ def load_mnist_model(cfg):
     return ftrModel
 
 def main(args = None):
-    print("Generating data for knn with mnist data")
+    print("Generating data for knn with cifar data")
 
     # --------------
     # Load settings
     # --------------
-    cfg = load_mnist_cfg()
+
+    cfg = load_cifar_cfg()
     if args is None: args = parse_args() # enable multiprocess
     set_cfg_from_args(cfg,args)
-    if args.cfg_file: cfg = read_cfg_file(args.cfg_file) # overwrite with cfg file.
+    if args.cfg_file: cfg = read_cfg_file(args.cfg_file) # overwrite with cfg 
     device = cfg.device
     cfg.use_cuda = args.no_cuda and torch.cuda.is_available()
+    print("Experiment Name: {}".format(cfg.exp_name))
     save_cfg(cfg)
     
     # -------------------
     # Load model & data
     # -------------------
 
-    # load the mnist data
+    # load the cifar data
     data = edict()
-    data.tr,data.te,data.tr_sub = load_mnist_data(cfg)
+    data.tr,data.te,data.tr_sub = load_cifar_data(cfg)
 
-    # load the mnist model
-    model = load_mnist_model(cfg)
+    # load the cifar model
+    model = load_cifar_model(cfg)
     th_model = model.th_model
     path = get_cfg_checkpoint_fn(cfg).format(0)
     save_pytorch_model(model.th_model,path)
@@ -80,7 +82,7 @@ def main(args = None):
     scheduler = StepLR(optimizer, step_size=1, gamma=cfg.gamma)
     inputs = [cfg, model, device, optimizer]
 
-    # te = test_step(1,data.te,*inputs[:-1]) # just for fun.
+    # te = test_step(1,data.te,*inputs[:-1])
     for epoch in range(cfg.epochs):
 
         # train & test the model

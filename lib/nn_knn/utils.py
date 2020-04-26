@@ -22,9 +22,12 @@ from learning.train import thtrain_cls
 from base.timer import Timer
 from base.thutils import *
 from base.utils import *
+from label_denoising.graph_kernel_2006 import graphKernel2006
+from base.config import get_cfg_checkpoint_fn,get_cfg_checkpoint_dir
 
 def save_results(tr,te,epoch,cfg):
-    rdir = osp.join(cfg.checkpoint_dir, "results_{}/".format(epoch))
+    checkpoint_dir = get_cfg_checkpoint_dir(cfg)
+    rdir = osp.join(checkpoint_dir, "results_{}/".format(epoch))
     if not osp.exists(rdir):
         os.makedirs(rdir)
 
@@ -34,8 +37,12 @@ def save_results(tr,te,epoch,cfg):
     sim_mat_path = osp.join(rdir, "sim_mat_{}.npy")
 
     # save cls info
-    tr_cls = {'acc':tr.acc,'recall':tr.recall,'precision':tr.precision}
-    te_cls = {'acc':te.acc,'recall':te.recall,'precision':te.precision}
+    tr_cls = {'acc':tr.acc,'recall':tr.recall,'precision':tr.precision,
+              'sm_acc':tr.sm_acc,'sm_recall':tr.sm_recall,'sm_precision':tr.sm_precision,
+    }
+    te_cls = {'acc':te.acc,'recall':te.recall,'precision':te.precision,
+              'sm_acc':te.sm_acc,'sm_recall':te.sm_recall,'sm_precision':te.sm_precision,
+    }
     write_pickle(tr_cls,cls_info_path.format("tr"))
     write_pickle(te_cls,cls_info_path.format("te"))
 
@@ -44,8 +51,8 @@ def save_results(tr,te,epoch,cfg):
     np.save(feature_path.format("te"),te.features)
     
     # save sim_mat
-    np.save(sim_mat_path.format("tr"),tr.sim_mat)
-    np.save(sim_mat_path.format("te"),te.sim_mat)
+    # np.save(sim_mat_path.format("tr"),tr.sim_mat)
+    # np.save(sim_mat_path.format("te"),te.sim_mat)
     
 def init_result_dict(epochs):
     t = edict()
@@ -113,6 +120,22 @@ def get_confmat_from_raw(outputs,data_loader):
             conf_mat[guess,cls] += 1
     return conf_mat
 
+def get_smoothed_confmat_from_raw(cfg,outputs,data_loader):
+    ncls = 10
+    cls_sum = np.zeros(ncls,dtype=np.int)
+    conf_mat = np.zeros((ncls,ncls),dtype=np.int)
+    prev = 0
+    for data, target in data_loader:
+        start = prev
+        end = start + len(target)
+        guesses = graphKernel2006(cfg.graphKernel2006,
+                                  outputs['cls'][start:end],
+                                  outputs[cfg.ftr_layer_name][start:end])
+        prev = end
+        for guess,cls in zip(guesses,target): # unravel the batch
+            conf_mat[guess,cls] += 1
+    return conf_mat
+
 def get_acc_from_confmat(confmat):
     return np_divide( np.trace(confmat), np.sum(confmat) )
 
@@ -144,8 +167,9 @@ def train_step(epoch, data, subset, cfg, model, device, optimizer):
     thtrain_cls(cfg, model.th_model, device, data, optimizer, epoch)
 
     # save updated params
-    path = cfg.checkpoint_fn.format(epoch+1)
-    save_pytorch_model(model.th_model,path)
+    if epoch in cfg.save_epochs or cfg.epochs == epoch + 1:
+        path = get_cfg_checkpoint_fn(cfg).format(epoch+1)
+        save_pytorch_model(model.th_model,path)
 
     # compute train results
     return test_step(model, subset, cfg, model, device)
@@ -161,6 +185,13 @@ def test_step(epoch, data, cfg, model, device):
     acc = get_acc_from_confmat(confmat)
     recall = get_recall_from_confmat(confmat)
     precision = get_precision_from_confmat(confmat)
+
+    if cfg.smoothing:
+        sm_confmat = get_smoothed_confmat_from_raw(cfg,outputs,data)
+        print(sm_confmat)
+        sm_acc = get_acc_from_confmat(sm_confmat)
+        sm_recall = get_recall_from_confmat(sm_confmat)
+        sm_precision = get_precision_from_confmat(sm_confmat)
     # ap = get_ap_from_raw(outputs,data)
     # mAP = get_map_from_ap(ap,data)
 
@@ -180,6 +211,10 @@ def test_step(epoch, data, cfg, model, device):
     results.acc = acc
     results.recall = recall
     results.precision = precision
+    if cfg.smoothing:
+        results.sm_acc = sm_acc
+        results.sm_recall = sm_recall
+        results.sm_precision = sm_precision
     # results.ap = ap
     # results.mAP = mAP
     print(results)
@@ -187,58 +222,5 @@ def test_step(epoch, data, cfg, model, device):
     results.sim_mat = sim_mat
 
     return results
-
-
-#----------------------------
-# DATASET SPECIFIC FUNCTIONS
-#----------------------------
-
-
-#
-# MNIST
-#
-
-cfg_from_file(filename,merge_to=None)
-def load_cfg_file(cfg_file):
-    cfg_file
-
-def load_mnist_cfg():
-    # todo: move to shared "cfg" home.
-    cfg = edict()
-    cfg.epochs = 15
-    cfg.device = 'cuda'
-    cfg.use_cuda = True
-    cfg.model_py = "./models/mnist/pytorch_default.py"
-    cfg.model_th = None
-    cfg.batch_size = 128
-    cfg.gamma = 0.7
-    cfg.log_interval = 10
-    cfg.lr = 1.0
-    cfg.seed = 1
-    cfg.test_batch_size = 128
-
-    cfg.root_path = settings.ROOT_PATH
-
-    # cfg.exp_name = 'testing'
-    cfg.exp_name = uuid.uuid4()
-    print(cfg.exp_name)
-    cfg.output_dir = 'mnist_knn'
-    cfg.checkpoint_dir = f"output/{cfg.output_dir}/{cfg.exp_name}/"
-    cfg.checkpoint_fn = osp.join(cfg.checkpoint_dir, "model_params_{}.th")
-    return cfg
-
-def load_mnist_model(cfg):
-
-    # load pytorch model
-    model_class = load_pytorch_model(cfg.model_py,cfg.model_th)
-    th_model = model_class().to(cfg.device)
-    model = PytorchModelWrapper(th_model)
-
-    # load feature extractor; e.g. "outputs" is more than final layer
-    layernames = [th_model.ftr_name,th_model.output_name]
-    ftrModel = FeatureExtractor(model,layernames)
-
-    return ftrModel
-
 
 

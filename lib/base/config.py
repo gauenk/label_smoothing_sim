@@ -1,5 +1,22 @@
-import yaml
+import yaml,os
 import numpy as np
+import os.path as osp
+from easydict import EasyDict as edict
+
+def save_cfg(cfg):
+    pdir = get_cfg_checkpoint_dir(cfg)
+    if not osp.exists(pdir):
+        os.makedirs(pdir)
+    path = osp.join(pdir, "config.yml")
+    print("WRITING CFG: ",path)
+    wstr = yaml.dump(cfg,default_flow_style=False)
+    with open(path,'w') as f:
+        f.write(wstr)
+
+def write_cfg_file(cfg,filepath):
+    wstr = yaml.dump(cfg,default_flow_style=False)
+    with open(filepath,'w') as f:
+        f.write(wstr)
 
 def merge_a_into_b(a,b):
     return _merge_a_into_b(a, b)
@@ -54,7 +71,7 @@ def read_cfg_file(cfg_file):
 def readYamlToEdict(yaml_file):
     import yaml
     with open(yaml_file, 'r') as f:
-        yaml_cfg = edict(yaml.load(f))
+        yaml_cfg = edict(yaml.load(f,Loader=yaml.FullLoader))
     return yaml_cfg
 
 def checkListEqualityWithOrder(list_a,list_b):
@@ -235,3 +252,10 @@ def cfg_from_edict(edict_obj,merge_to=None):
     else:
         merge_a_into_b(edict_obj, merge_to) 
     load_tp_fn_record_path()
+
+def get_cfg_checkpoint_dir(cfg):
+    return f"output/{cfg.output_dir}/{cfg.exp_name}/"
+
+def get_cfg_checkpoint_fn(cfg):
+    return osp.join(get_cfg_checkpoint_dir(cfg),"model_params_{}.th")
+
